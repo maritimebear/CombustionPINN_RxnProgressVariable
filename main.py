@@ -46,6 +46,7 @@ Tensor: TypeAlias = Union[np.ndarray, torch.Tensor]
 torch.manual_seed(7673345)
 torch.set_default_dtype(torch.float64)  # Double precision required for L-BFGS? https://stackoverflow.com/questions/73019486/torch-optim-lbfgs-does-not-change-parameters
 plt.ioff()
+R = 8.314  # Universal Gas Constant, J/K-mol
 
 # --- Parameters --- #
 n_collocation_points = 1_000
@@ -61,5 +62,12 @@ extents_x = (0.0, 1e-1)
 # Loss weights
 weight_dataloss = 0.0
 weight_residualloss = 1.0
+
+# Training loop control
+n_epochs = 10_000  # Use with for-loop
+converged = False  # Use with while-loop with convergence control
+convergence_threshold = 1e-1
+convergence_sustain_duration = 10
+n_converged = 0
 
 
