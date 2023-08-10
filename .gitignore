@@ -1,0 +1,6 @@
+__pycache__
+# Text files for organisation and planning
+outline.* 
+.flake8
+log_*
+runs
