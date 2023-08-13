@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 
 import training
 import network
+import plotters
 
 from typing import TypeAlias
 Tensor: TypeAlias = torch.Tensor
@@ -89,21 +90,57 @@ lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimiser, gamma=lr_decay_
 # Set up losses
 loss_fns = {key: training.WeightedScalarLoss(torch.nn.MSELoss(), weight=value) for
             key, value in loss_weights.items()}
+loss_history = {key: list() for key, _ in loss_weights.item()}  # Losses per iteration
 
+# Sampler to randomly sample collocation points in each training iteration
+residual_sampler = training.UniformRandomSampler(n_points=n_residual_points, extents=[extents_x])
+residual_norm = {"l2": list(), "max": list()}  # Tracks norms of residual vector per test iteration
 
 # Training loop
-loss_history = {key: list() for key, _ in loss_weights.item()}  # Mean losses per epoch
-
 for epoch in range(num_epochs):
-    losses_epoch.append(includes.train(dataloader, network, loss, optimiser))
+    # Train both data and residual losses concurrently
+    for batch in dataloader:
+        optimiser.zero_grad()
+        x_data, y_data = batch
+        yh_data = network(x_data)  # Data prediction
+        x_res = residual_sampler()
+        yh_res = network(x_res)  # Prediction at collocation points
+        residual = c_equation(yh_res, x_res)  # Residuals at collocation points
+        loss_data = loss_fns["data"](yh_data, y_data)
+        loss_res = loss_fns["residual"](residual, torch.zeros_like(residual))
+        loss_total = loss_data + loss_res
+        loss_total.backward()
+        optimiser.step()
+        if lr_scheduler is not None:
+            lr_scheduler.step()
+        # Save losses for plotting
+        loss_history["data"].append(loss_data.detach.item())
+        loss_history["residual"].append(loss_res.detach.item())
+    # After each training epoch, do a test iteration on testgrid
+    yh_test = network(testgrid)
+    residual_test = c_equation(yh_test, testgrid)
+    residual_norm["l2"].append(torch.linalg.norm(residual_test.detach()))
+    residual_norm["max"].append(torch.linalg.norm(residual_test.detach()), ord=float('inf'))
 
-    y_test = network(testgrid)
-    print(f"Epoch: {epoch}, Epoch loss: {losses_epoch[-1]}")
+    print(f"Epoch: {epoch}")
 
-    if not (epoch + 1) % 10:
-        fig, axs = plt.subplots(2, 1, figsize=(4,8))
-        axs[0].semilogy(losses_epoch)
-        axs[1].plot(testgrid, y_test.detach().numpy())
+    if not (epoch + 1) % 100:
+        # Plot losses
+        _, ax_loss = plt.subplots(1, 1, figsize=(4, 4))
+        for _label, _list in loss_history.items():
+            ax_loss = plotters.semilogy_plot(ax_loss, _list, label=_label,
+                                             ylabel="Loss", xlabel="Iteration", title="Loss curves")
+
+        # Plot test-iteration residual norms
+        _, ax_resnorms = plt.subplots(1, 1, figsize=(4, 4))
+        for _label, _list in residual_norm.items():
+            ax_resnorms = plotters.semilogy_plot(ax_resnorms, _list, label=_label,
+                                                 ylabel="||r||", xlabel=f"Iterations * {num_epochs}",
+                                                 title="Residual norms, test iteration")
+
+        # Plot prediction on testgrid
+        _, ax_pred = plt.subplots(1, 1, figsize=(4, 4))
+        ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().to_numpy(), testgrid.to_numpy(),
+                                   ylabel="c", xlabel="x (m)", title="Reaction progress variable")
 
         plt.show()
-
