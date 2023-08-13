@@ -13,11 +13,13 @@ import matplotlib.pyplot as plt
 import includes
 import network
 
-datafile = "./rxn_progress_data.csv"
+# datafile = "./rxn_progress_data.csv"
+datafile = "./c_eqn_solution.csv"
 batch_size = 64
 learning_rate = 1e-4
 num_epochs = 10_000
 
+torch.manual_seed(7673345)
 torch.set_default_dtype(torch.float64)
 
 df = pd.read_csv(datafile)
