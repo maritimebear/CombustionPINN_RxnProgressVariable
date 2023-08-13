@@ -61,8 +61,8 @@ def c_equation(y: Tensor, x: Tensor) -> Tensor:
     # Calculates residual D(y; x)
     # Residual == 0 when y(x) satisfies equation system D(y; x)
 
-    y_x = torch.autograd.grad(y, x, grad_outputs=torch.ones_like(y), create_graphs=True)[0]  # First derivative
-    y_xx = torch.autograd.grad(y_x, x, grad_outputs=torch.ones_like(y_x), create_graphs=True)[0]  # Second derivative
+    y_x = torch.autograd.grad(y, x, grad_outputs=torch.ones_like(y), create_graph=True)[0]  # First derivative
+    y_xx = torch.autograd.grad(y_x, x, grad_outputs=torch.ones_like(y_x), create_graph=True)[0]  # Second derivative
 
     return ((rho_0 * u_0 * y_x)
             - (k / c_p * y_xx)
