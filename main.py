@@ -45,17 +45,30 @@ import matplotlib.pyplot as plt
 import training
 import network
 
+from typing import TypeAlias
+Tensor: TypeAlias = torch.Tensor
+
 # --- Parameters --- #
 
-# datafile = "./data/rxn_progress_data.csv"
+# Training parameters
 datafile = "./data/c_eqn_solution.csv"
 batch_size = 64
 learning_rate = 1e-4
+lr_decay_exp = 1 - 1e-4  # Exponential learning rate decay
 num_epochs = 10_000
+
+loss_weights = {"data": 1.0, "residual": 1.0}
 
 torch.manual_seed(7673345)
 
-# System parameters
+# Residuals and domain
+n_residual_points = 1000
+extents_x = (0.0, 2e-2)
+
+# Test step and error calculation
+n_test_points = 101
+
+# Thermodynamic and chemical parameters
 rho_0 = 1.130
 u_0 = 0.3788
 T_0 = 298
@@ -67,19 +80,37 @@ A = 347850542  # Arrhenius pre-exponential factor
 
 # --- end of parameters --- #
 
+
+def c_equation(y: Tensor, x: Tensor) -> Tensor:
+    # Calculates residual D(y; x)
+    # Residual == 0 when y(x) satisfies equation system D(y; x)
+
+    y_x = torch.autograd.grad(y, x, grad_outputs=torch.ones_like(y), create_graphs=True)[0]  # First derivative
+    y_xx = torch.autograd.grad(y_x, x, grad_outputs=torch.ones_like(y_x), create_graphs=True)[0]  # Second derivative
+
+    return ((rho_0 * u_0 * y_x)
+            - (k / c_p * y_xx)
+            - (A * (1 - y)
+               * (rho_0 * T_0 / (T_0 + y * (T_end - T_0)))
+               * torch.exp(-T_act / (T_0 + y * (T_end - T_0)))
+               )
+            )
+
+
 torch.set_default_dtype(torch.float64)
 
 # Load data
 dataset = training.PINN_Dataset(datafile, ["x"], ["reaction_progress"])
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+# Test grid
+testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1)
+
 # Setup network
 network = network.FCN(1, 1, 64, 4)
 loss = torch.nn.MSELoss()
 optimiser = torch.optim.Adam(network.parameters(), lr=learning_rate)
-
-# Test grid
-testgrid = torch.linspace(0, 2e-2, 101).reshape(-1, 1)
+lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimiser, gamma=lr_decay_exp)
 
 # Training loop
 losses_epoch = list()
