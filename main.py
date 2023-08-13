@@ -90,7 +90,7 @@ lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimiser, gamma=lr_decay_
 # Set up losses
 loss_fns = {key: training.WeightedScalarLoss(torch.nn.MSELoss(), weight=value) for
             key, value in loss_weights.items()}
-loss_history = {key: list() for key, _ in loss_weights.item()}  # Losses per iteration
+loss_history = {key: list() for key, _ in loss_weights.items()}  # Losses per iteration
 
 # Sampler to randomly sample collocation points in each training iteration
 residual_sampler = training.UniformRandomSampler(n_points=n_residual_points, extents=[extents_x])
