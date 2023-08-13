@@ -42,7 +42,7 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import includes
+import training
 import network
 
 # --- Parameters --- #
@@ -69,10 +69,11 @@ A = 347850542  # Arrhenius pre-exponential factor
 
 torch.set_default_dtype(torch.float64)
 
-df = pd.read_csv(datafile)
-
-dataset = includes.Dataset(df)
+# Load data
+dataset = training.PINN_Dataset(datafile, ["x"], ["reaction_progress"])
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+# Setup network
 network = network.FCN(1, 1, 64, 4)
 loss = torch.nn.MSELoss()
 optimiser = torch.optim.Adam(network.parameters(), lr=learning_rate)
