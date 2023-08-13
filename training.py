@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
+import torch
 
-from typing import Union
+from typing import Union, Callable, TypeAlias
+Tensor: TypeAlias = torch.tensor
 
 
 class PINN_Dataset():
@@ -54,6 +56,21 @@ class PINN_Dataset():
 
     def __getitem__(self, idx: int) -> tuple[np.ndarray, np.ndarray]:
         return (self._inputs[idx], self._outputs[idx])
+# end class PINN_Dataset
 
 
+class WeightedScalarLoss():
+    """
+    Callable class to calculate a generic scalar loss, multiplied by a weight.
+    """
+    def __init__(self,
+                 loss_fn: Callable[[Tensor], float],
+                 weight: float = 1.0):
+        self.loss_fn = loss_fn  # Function/callable class pointer
+        self.weight = weight
 
+    def __call__(self,
+                 prediction: Tensor,
+                 target: Tensor) -> float:
+        return (self.weight * self.loss_fn(prediction, target))
+# end class WeightedScalarLoss

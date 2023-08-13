@@ -106,11 +106,16 @@ dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle
 # Test grid
 testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1)
 
-# Setup network
+# Set up network
 network = network.FCN(1, 1, 64, 4)
 loss = torch.nn.MSELoss()
 optimiser = torch.optim.Adam(network.parameters(), lr=learning_rate)
 lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimiser, gamma=lr_decay_exp)
+
+# Set up losses
+loss_fns = {key: training.WeightedScalarLoss(torch.nn.MSELoss(), weight=value) for
+            key, value in loss_weights.items()}
+
 
 # Training loop
 losses_epoch = list()
