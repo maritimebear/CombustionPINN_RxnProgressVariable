@@ -10,36 +10,11 @@ CH4 + 2O2 -> CO2 + 2H2O
 
 -----------------------
 
-Reference data was obtained by using this mechanism in Cantera with the system specified below:
-
-System state parameters:
-0: inlet, end: outlet
-------------
-T_0 = 298 K
-T_end = 2315.733 K
-P = 101325 Pa, isobaric system
-rho_0 = 1.130 kg/m^3 (inlet density)
-u_0 = 0.3788 m/s (inlet velocity, == laminar flame speed)
-
-Gas properties at inlet state, assumed to be constant:
-------------
-*** Units assumed to be SI, not specified in Cantera results ***
-
-Thermal conductivity = 0.02715 W/m-K
-Isobaric specific heat capacity = 1076.858 J/kg-K
-
-Arrhenius coefficients:
-------------
-
-Activation energy = 83680 J/mol
-Activation temperature = 10064.951 K (= activation energy / universal gas constant)
-Pre-exponential factor = 347850542 (from Cantera, units unspecified)
-Temperature exponent = 0
+Reference data was obtained by using this mechanism in Cantera with the FreeFlame solver.
 """
 
 
 import torch
-import pandas as pd
 import matplotlib.pyplot as plt
 
 import training
@@ -103,12 +78,11 @@ torch.set_default_dtype(torch.float64)
 dataset = training.PINN_Dataset(datafile, ["x"], ["reaction_progress"])
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-# Test grid
+# Test grid to plot change of prediction over training
 testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1)
 
 # Set up network
 network = network.FCN(1, 1, 64, 4)
-loss = torch.nn.MSELoss()
 optimiser = torch.optim.Adam(network.parameters(), lr=learning_rate)
 lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimiser, gamma=lr_decay_exp)
 
@@ -118,17 +92,18 @@ loss_fns = {key: training.WeightedScalarLoss(torch.nn.MSELoss(), weight=value) f
 
 
 # Training loop
-losses_epoch = list()
+loss_history = {key: list() for key, _ in loss_weights.item()}  # Mean losses per epoch
+
 for epoch in range(num_epochs):
     losses_epoch.append(includes.train(dataloader, network, loss, optimiser))
-    
+
     y_test = network(testgrid)
     print(f"Epoch: {epoch}, Epoch loss: {losses_epoch[-1]}")
-    
+
     if not (epoch + 1) % 10:
         fig, axs = plt.subplots(2, 1, figsize=(4,8))
         axs[0].semilogy(losses_epoch)
         axs[1].plot(testgrid, y_test.detach().numpy())
-    
+
         plt.show()
-    
+
