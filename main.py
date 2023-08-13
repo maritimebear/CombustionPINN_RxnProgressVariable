@@ -80,7 +80,7 @@ dataset = training.PINN_Dataset(datafile, ["x"], ["reaction_progress"])
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # Test grid to plot change of prediction over training
-testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1)
+testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1).requires_grad_(True)
 
 # Set up network
 network = network.FCN(1, 1, 64, 4)
@@ -114,13 +114,13 @@ for epoch in range(num_epochs):
         if lr_scheduler is not None:
             lr_scheduler.step()
         # Save losses for plotting
-        loss_history["data"].append(loss_data.detach.item())
-        loss_history["residual"].append(loss_res.detach.item())
+        loss_history["data"].append(loss_data.detach().item())
+        loss_history["residual"].append(loss_res.detach().item())
     # After each training epoch, do a test iteration on testgrid
     yh_test = network(testgrid)
     residual_test = c_equation(yh_test, testgrid)
     residual_norm["l2"].append(torch.linalg.norm(residual_test.detach()))
-    residual_norm["max"].append(torch.linalg.norm(residual_test.detach()), ord=float('inf'))
+    residual_norm["max"].append(torch.linalg.norm(residual_test.detach(), ord=float('inf')))
 
     print(f"Epoch: {epoch}")
 
@@ -140,7 +140,7 @@ for epoch in range(num_epochs):
 
         # Plot prediction on testgrid
         _, ax_pred = plt.subplots(1, 1, figsize=(4, 4))
-        ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().to_numpy(), testgrid.to_numpy(),
+        ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().numpy(), testgrid.detach().numpy(),
                                    ylabel="c", xlabel="x (m)", title="Reaction progress variable")
 
         plt.show()
