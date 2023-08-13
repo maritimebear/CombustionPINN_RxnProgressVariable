@@ -70,7 +70,7 @@ n_residual_points = 1000
 batch_size = 64  # Number of Cantera data points per batch
 
 # Learning rate and decay control
-lr_Adam = 1e-2
+lr_Adam = 1e-4
 lr_decay_exp = 1 - 1e-4  # Exponent for exponential learning rate decay
 
 # Domain definition
@@ -109,7 +109,7 @@ testgrid = torch.linspace(*extents_x, testgrid_n_points, requires_grad=True).res
 # Set up model
 model = network.FCN(1,  # inputs: x
                     1,  # outputs: c
-                    32,  # number of neurons per hidden layer
+                    64,  # number of neurons per hidden layer
                     4)  # number of hidden layers
 
 # Set up optimiser
@@ -209,37 +209,38 @@ def plot(u_h, error, residuals) -> None:
 
 # for-loop to train for a specified number of epochs
 # epochs wrt dataset size and batch size of ground truth data
-# for i in range(n_epochs):
-    # print(f"Epoch: {i}")
-    # _ = train_iteration(optimiser_Adam, step=True, lr_scheduler=lr_scheduler_Adam)  # Discard return value, losses appended to lists
-    # test_tensors, _ = test()  # Discard convergence control in for-loop
-    # plot(*test_tensors)
-
-# while-loop to train until converged wrt convergence control returned by test()
-epoch_ctr = 0
-while not converged:
-    _ = train_iteration(optimiser_Adam, step=True, lr_scheduler=None)  # Discard return value, losses appended to lists
-    test_tensors, convergence_control = test()
-
-    epoch_ctr += 1
-    if not epoch_ctr % 10:
+for i in range(n_epochs):
+    print(f"Epoch: {i}")
+    _ = train_iteration(optimiser_Adam, step=True, lr_scheduler=lr_scheduler_Adam)  # Discard return value, losses appended to lists
+    test_tensors, _ = test()  # Discard convergence control in for-loop
+    if not (i+1) % 100:
         plot(*test_tensors)
 
-    if convergence_control <= convergence_threshold:  # threshold defined in main namespace
-        n_converged += 1
-        print(f"Epoch: {epoch_ctr}\t" +
-              f"Convergence control: {convergence_control}\t" +
-              f"Threshold: {convergence_threshold}\t" +
-              f"Remaining: {convergence_sustain_duration - n_converged}")
-    else:
-        n_converged = 0
-        print(f"Epoch: {epoch_ctr}\t" +
-              f"Convergence control: {convergence_control}\t" +
-              f"Threshold: {convergence_threshold}")
+# # while-loop to train until converged wrt convergence control returned by test()
+# epoch_ctr = 0
+# while not converged:
+#     _ = train_iteration(optimiser_Adam, step=True, lr_scheduler=None)  # Discard return value, losses appended to lists
+#     test_tensors, convergence_control = test()
 
-    if n_converged >= convergence_sustain_duration:
-        converged = True
-        print(f"Training converged in {epoch_ctr} epochs")
+#     epoch_ctr += 1
+#     if not epoch_ctr % 10:
+#         plot(*test_tensors)
+
+#     if convergence_control <= convergence_threshold:  # threshold defined in main namespace
+#         n_converged += 1
+#         print(f"Epoch: {epoch_ctr}\t" +
+#               f"Convergence control: {convergence_control}\t" +
+#               f"Threshold: {convergence_threshold}\t" +
+#               f"Remaining: {convergence_sustain_duration - n_converged}")
+#     else:
+#         n_converged = 0
+#         print(f"Epoch: {epoch_ctr}\t" +
+#               f"Convergence control: {convergence_control}\t" +
+#               f"Threshold: {convergence_threshold}")
+
+#     if n_converged >= convergence_sustain_duration:
+#         converged = True
+#         print(f"Training converged in {epoch_ctr} epochs")
 
 # Plot final results
 final_test, _ = test()
