@@ -30,7 +30,7 @@ def logistic(x, x0=flame_location, k=flame_width_parameter, L=1.0):
 
 
 def c_equation(y, x):
-    # Evaluate c_eqn at x
+    # Evaluate c_eqn residual
     # Taken from PINN script
 
     y_x = torch.autograd.grad(y, x, grad_outputs=torch.ones_like(y), create_graph=True)[0]  # First derivative
