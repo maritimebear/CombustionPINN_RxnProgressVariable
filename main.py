@@ -29,8 +29,8 @@ Tensor: TypeAlias = torch.Tensor
 # Training parameters
 datafile = "./data/c_eqn_solution.csv"
 batch_size = 64
-learning_rate = 1e-4
-lr_decay_exp = 1 - 1e-4  # Exponential learning rate decay
+learning_rate = 1e-3
+lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
 num_epochs = 10_000
 
 loss_weights = {"data": 1.0, "residual": 1.0}
@@ -83,7 +83,7 @@ dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle
 testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1).requires_grad_(True)
 
 # Set up network
-network = network.FCN(1, 1, 64, 4)
+network = network.FCN(1, 1, 64, 9)
 optimiser = torch.optim.Adam(network.parameters(), lr=learning_rate)
 lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimiser, gamma=lr_decay_exp)
 
