@@ -34,6 +34,7 @@ lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
 num_epochs = 10_000
 
 loss_weights = {"data": 1.0, "residual": 1.0}
+grad_clip_limit = 1.0  # Maximum value for gradient clipping
 
 torch.manual_seed(7673345)
 
@@ -110,6 +111,8 @@ for epoch in range(num_epochs):
         loss_res = loss_fns["residual"](residual, torch.zeros_like(residual))
         loss_total = loss_data + loss_res
         loss_total.backward()
+        # Clip gradient, not sure about maximum value
+        torch.nn.utils.clip_grad_norm(network.parameters(), grad_clip_limit)
         optimiser.step()
         if lr_scheduler is not None:
             lr_scheduler.step()
