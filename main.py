@@ -138,7 +138,7 @@ for epoch in range(num_epochs):
         _, ax_resnorms = plt.subplots(1, 1, figsize=(4, 4))
         for _label, _list in residual_norm.items():
             ax_resnorms = plotters.semilogy_plot(ax_resnorms, _list, label=_label,
-                                                 ylabel="||r||", xlabel=f"Iterations * {num_epochs}",
+                                                 ylabel="||r||", xlabel="Epoch",
                                                  title="Residual norms, test iteration")
 
         # Plot prediction on testgrid
