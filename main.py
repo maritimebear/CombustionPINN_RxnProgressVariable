@@ -21,7 +21,12 @@ import training
 import network
 import plotters
 
-from typing import TypeAlias
+# CIP pool runs Python 3.9, TypeAlias in typing for >= 3.10
+try:
+    from typing import TypeAlias
+except ImportError:
+    from typing_extensions import TypeAlias
+
 Tensor: TypeAlias = torch.Tensor
 
 # --- Parameters --- #
@@ -36,6 +41,7 @@ num_epochs = 10_000
 loss_weights = {"data": 1.0, "residual": 1.0}
 
 torch.manual_seed(7673345)
+use_gpu = True
 
 # Residuals and domain
 n_residual_points = 1000
@@ -75,15 +81,18 @@ def c_equation(y: Tensor, x: Tensor) -> Tensor:
 
 torch.set_default_dtype(torch.float64)
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 # Load data
 dataset = training.PINN_Dataset(datafile, ["x"], ["reaction_progress"])
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # Test grid to plot change of prediction over training
 testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1).requires_grad_(True)
+testgrid = testgrid.to(device)
 
 # Set up network
-network = network.FCN(1, 1, 64, 9)
+network = network.FCN(1, 1, 64, 9).to(device)
 optimiser = torch.optim.Adam(network.parameters(), lr=learning_rate)
 lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimiser, gamma=lr_decay_exp)
 
@@ -101,9 +110,9 @@ for epoch in range(num_epochs):
     # Train both data and residual losses concurrently
     for batch in dataloader:
         optimiser.zero_grad()
-        x_data, y_data = batch
+        x_data, y_data = [t.to(device) for t in batch]
         yh_data = network(x_data)  # Data prediction
-        x_res = residual_sampler()
+        x_res = residual_sampler().to(device)
         yh_res = network(x_res)  # Prediction at collocation points
         residual = c_equation(yh_res, x_res)  # Residuals at collocation points
         loss_data = loss_fns["data"](yh_data, y_data)
