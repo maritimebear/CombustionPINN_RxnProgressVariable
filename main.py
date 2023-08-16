@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import training
 import network
 import plotters
+import logger
 
 # CIP pool runs Python 3.9, TypeAlias in typing for >= 3.10
 try:
@@ -32,6 +33,7 @@ Tensor: TypeAlias = torch.Tensor
 # --- Parameters --- #
 
 # Training parameters
+run_name = "bs_64_lr_1e-3_lrd_1e-8_nres_1000"
 datafile = "./data/c_eqn_solution.csv"
 batch_size = 64
 learning_rate = 1e-3
@@ -105,6 +107,10 @@ loss_history = {key: list() for key, _ in loss_weights.items()}  # Losses per it
 residual_sampler = training.UniformRandomSampler(n_points=n_residual_points, extents=[extents_x])
 residual_norm = {"l2": list(), "max": list()}  # Tracks norms of residual vector per test iteration
 
+# Set up loggers to track loss and residual history as .csv files
+logger_loss = logger.DictLogger(loss_history, f"runs/log_{run_name}_loss.csv", "Iteration")
+logger_residual = logger.DictLogger(residual_norm, f"runs/log_{run_name}_residual.csv", "Epoch")
+
 # Training loop
 for epoch in range(num_epochs):
     # Train both data and residual losses concurrently
@@ -134,22 +140,25 @@ for epoch in range(num_epochs):
     print(f"Epoch: {epoch}")
 
     if not (epoch + 1) % 100:
-        # Plot losses
-        _, ax_loss = plt.subplots(1, 1, figsize=(4, 4))
-        for _label, _list in loss_history.items():
-            ax_loss = plotters.semilogy_plot(ax_loss, _list, label=_label,
-                                             ylabel="Loss", xlabel="Iteration", title="Loss curves")
+        # Update loggers
+        _ = [_logger.update() for _logger in (logger_loss, logger_residual)]
 
-        # Plot test-iteration residual norms
-        _, ax_resnorms = plt.subplots(1, 1, figsize=(4, 4))
-        for _label, _list in residual_norm.items():
-            ax_resnorms = plotters.semilogy_plot(ax_resnorms, _list, label=_label,
-                                                 ylabel="||r||", xlabel="Epoch",
-                                                 title="Residual norms, test iteration")
+        # # Plot losses
+        # _, ax_loss = plt.subplots(1, 1, figsize=(4, 4))
+        # for _label, _list in loss_history.items():
+        #     ax_loss = plotters.semilogy_plot(ax_loss, _list, label=_label,
+        #                                      ylabel="Loss", xlabel="Iteration", title="Loss curves")
 
-        # Plot prediction on testgrid
-        _, ax_pred = plt.subplots(1, 1, figsize=(4, 4))
-        ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().numpy(), testgrid.detach().numpy(),
-                                   ylabel="c", xlabel="x (m)", title="Reaction progress variable")
+        # # Plot test-iteration residual norms
+        # _, ax_resnorms = plt.subplots(1, 1, figsize=(4, 4))
+        # for _label, _list in residual_norm.items():
+        #     ax_resnorms = plotters.semilogy_plot(ax_resnorms, _list, label=_label,
+        #                                          ylabel="||r||", xlabel="Epoch",
+        #                                          title="Residual norms, test iteration")
 
-        plt.show()
+        # # Plot prediction on testgrid
+        # _, ax_pred = plt.subplots(1, 1, figsize=(4, 4))
+        # ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().numpy(), testgrid.detach().numpy(),
+        #                            ylabel="c", xlabel="x (m)", title="Reaction progress variable")
+
+        # plt.show()
