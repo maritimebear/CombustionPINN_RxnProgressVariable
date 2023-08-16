@@ -16,6 +16,7 @@ Reference data was obtained by using this mechanism in Cantera with the FreeFlam
 
 import torch
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 import training
 import network
@@ -179,7 +180,8 @@ while not converged:
 #         _ = [_logger.update() for _logger in (logger_loss, logger_residual)]
 
 
-network.save()
+torch.save(network.state_dict(),
+           f"model_state_dict_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
 
 
 # Plotting, unused?
