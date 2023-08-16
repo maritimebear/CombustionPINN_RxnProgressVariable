@@ -12,7 +12,7 @@ class DictLogger():
     index_column: str  # Label of index column, eg. Iteration, or Epoch
     idx: int = field(default=0, init=False)  # Tracks last-written index of data
 
-    def __post__init__(self) -> None:
+    def __post_init__(self) -> None:
         # Create .csv file after __init__()
         assert self._get_len() == 0, "Check that all lists in the data dictionary are empty when initialising logger"
         # First line of .csv, names of columns
