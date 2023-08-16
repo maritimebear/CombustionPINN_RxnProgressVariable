@@ -91,7 +91,6 @@ dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle
 
 # Test grid to plot change of prediction over training
 testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1).requires_grad_(True)
-testgrid = testgrid.to(device)
 
 # Set up network
 network = network.FCN(1, 1, 64, 9).to(device)
@@ -111,8 +110,8 @@ residual_norm = {"l2": list(), "max": list()}  # Tracks norms of residual vector
 logger_loss = logger.DictLogger(loss_history, f"runs/log_{run_name}_loss.csv", "Iteration")
 logger_residual = logger.DictLogger(residual_norm, f"runs/log_{run_name}_residual.csv", "Epoch")
 
-# Training loop
-for epoch in range(num_epochs):
+
+def train_iteration() -> None:
     # Train both data and residual losses concurrently
     for batch in dataloader:
         optimiser.zero_grad()
@@ -131,17 +130,58 @@ for epoch in range(num_epochs):
         # Save losses for plotting
         loss_history["data"].append(loss_data.detach().item())
         loss_history["residual"].append(loss_res.detach().item())
-    # After each training epoch, do a test iteration on testgrid
+
+
+def test_residuals(threshold) -> bool:
+    # Returns bool: if converged, for training-while loop
     yh_test = network(testgrid)
     residual_test = c_equation(yh_test, testgrid)
     residual_norm["l2"].append(torch.linalg.norm(residual_test.detach()))
     residual_norm["max"].append(torch.linalg.norm(residual_test.detach(), ord=float('inf')))
 
+    convergence_control = residual_norm["max"][-1]
+    return convergence_control <= threshold
+
+
+# Training loop
+epoch = 0
+converged = False
+convergence_threshold = 1e-5
+convergence_duration = 10
+converged_ctr = 0
+
+# # While loop
+while not converged:
     print(f"Epoch: {epoch}")
+    train_iteration()
+    epoch += 1
+    # After each training epoch, do a test iteration on testgrid
+    converged_ctr = converged_ctr + 1 if test_residuals(convergence_threshold) else 0
+    if converged_ctr >= convergence_duration:
+        print(f"Training converged in {epoch} epochs")
+        converged = True
 
     if not (epoch + 1) % 100:
         # Update loggers
         _ = [_logger.update() for _logger in (logger_loss, logger_residual)]
+
+
+# # For loop
+# for epoch in range(num_epochs):
+#     print(f"Epoch: {epoch}")
+#     train_iteration()
+#     # After each training epoch, do a test iteration on testgrid
+#     _ = test_residuals(0.0)
+
+#     if not (epoch + 1) % 100:
+#         # Update loggers
+#         _ = [_logger.update() for _logger in (logger_loss, logger_residual)]
+
+
+network.save()
+
+
+# Plotting, unused?
 
         # # Plot losses
         # _, ax_loss = plt.subplots(1, 1, figsize=(4, 4))
