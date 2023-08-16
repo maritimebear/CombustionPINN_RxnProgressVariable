@@ -91,6 +91,7 @@ dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle
 
 # Test grid to plot change of prediction over training
 testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1).requires_grad_(True)
+testgrid = testgrid.to(device)
 
 # Set up network
 network = network.FCN(1, 1, 64, 9).to(device)
