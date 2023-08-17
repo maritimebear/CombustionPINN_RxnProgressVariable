@@ -27,17 +27,17 @@ Tensor: TypeAlias = torch.Tensor
 # --- Parameters --- #
 
 # Training parameters
-saved_state_path = "Logistic_600_epochs.pt"
+saved_state_path = "Logistic_600_epochs_thinflame.pt"
 save_name = "test.pt"
 # saved_state_path = None
 datafile = "./data/c_eqn_solution.csv"
 batch_size = 64
-learning_rate = 1e-5
+learning_rate = 1e-6
 lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
-n_epochs = 10_000
+n_epochs = 50_000
 
 loss_weights = {"data": 1.0, "residual": 1e-8}
-grad_clip_limit = 1e-8  # Maximum value for gradient clipping
+grad_clip_limit = 1e-6  # Maximum value for gradient clipping
 
 torch.manual_seed(7673345)
 
@@ -146,7 +146,7 @@ def warmstart(num_epochs: int, loadfile: str = None):
             _, ax_resnorms = plt.subplots(1, 1, figsize=(4, 4))
             for _label, _list in residual_norm.items():
                 ax_resnorms = plotters.semilogy_plot(ax_resnorms, _list, label=_label,
-                                                     ylabel="||r||", xlabel=f"Iterations * {num_epochs}",
+                                                     ylabel="||r||", xlabel="Epoch",
                                                      title="Residual norms, test iteration")
 
             # Plot prediction on testgrid

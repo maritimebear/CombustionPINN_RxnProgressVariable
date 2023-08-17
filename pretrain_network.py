@@ -15,17 +15,17 @@ def logistic_fn(x, x0, k, L=1.0) -> None:
 
 # --- Parameters --- #
 
-save_path = "Logistic_600_epochs.pt"
+save_path = "Logistic_600_epochs_thinflame.pt"
 flame_location = 7e-3
-flame_width_parameter = 1e3
+flame_width_parameter = 1e6
 
 # Training parameters
 pretrain_fn = logistic_fn
 pretrain_fn_args = [flame_location, flame_width_parameter]
 
 batch_size = 64
-learning_rate = 1e-5
-n_epochs = 600
+learning_rate = 1e-3
+n_epochs = 1_000
 
 loss_weights = {"data": 1.0}
 
