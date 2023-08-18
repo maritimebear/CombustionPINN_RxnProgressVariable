@@ -4,12 +4,15 @@ import torch
 
 # CIP pool runs Python 3.9, TypeAlias in typing for >= 3.10
 try:
-    from typing import Union, Callable, TypeAlias, Sequence
+    from collections.abc import Iterator
+    from typing import Union, Callable, TypeAlias, Sequence, TypeVar
 except ImportError:
-    from typing import Union, Callable, Sequence
+    from collections.abc import Iterator
+    from typing import Union, Callable, Sequence, TypeVar
     from typing_extensions import TypeAlias
 
 Tensor: TypeAlias = torch.tensor
+T = TypeVar("T")
 
 
 def train_step_data(x, y, model, loss_fn) -> Tensor:
@@ -28,6 +31,29 @@ def chain_callables(base_arg: Tensor,
     for i in range(1, len(callables)):
         results.append(callables[i](results[-1], second_args[i-1]))
     return results
+
+
+def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Iterator[list[tuple[T]]]:
+    # Combine multiple iterators of different lengths
+    # Returned iterator lasts until the longest iterator in the input list lasts
+    # All other (i.e. shorter) iterators in the input will be cycled
+    # Intended to combine multiple torch Dataloaders of different lengths
+    # Inspired by itertools.zip_longest()
+    assert (n_active := len(iterator_list)) > 0, "Input list is empty?"
+    iterators = [iter(it) for it in iterator_list]
+    while True:
+        values = []
+        for i, it in enumerate(iterators):
+            try:
+                value = next(it)
+            except StopIteration:
+                n_active -= 1
+                if not n_active:
+                    raise  # Rethrow StopIteration from longest iterator
+                iterators[i] = iter(iterator_list[i])  # Cycle expired iterator
+                value = next(iterators[i])
+            values.append(value)
+        yield values
 
 
 class SampledDataset():
