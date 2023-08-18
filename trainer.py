@@ -85,7 +85,7 @@ class Trainer_lists():
             # superbatch: [(x, y), (x, y), ...], each (x, y) corresponds to a loss_fn
             losses = [loss_fn(self.model(x), y) for
                       loss_fn, (x, y) in zip(self.loss_fns, superbatch)]
-            loss_total = sum(losses)
+            losses.append(loss_total := sum(losses))
 
             self.optimiser.zero_grad()
 
@@ -101,6 +101,5 @@ class Trainer_lists():
 
             losses_mean = [losses_mean[i] + losses[i].detach().item() for
                            i in range(len(losses))]
-            losses_mean[-1] += loss_total.detach().item()
 
         return [value / len(losses_mean) for value in losses_mean]
