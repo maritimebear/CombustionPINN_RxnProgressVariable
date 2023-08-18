@@ -14,7 +14,7 @@ Tensor: TypeAlias = torch.Tensor
 DataLoader: TypeAlias = torch.utils.data.DataLoader
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, eq=False)
 class Trainer():
     dataloaders: list[DataLoader]
     model: torch.nn.Module
@@ -64,7 +64,7 @@ class Trainer():
                 key, _list in mean_losses.items()}
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, eq=False)
 class Trainer_lists():
     dataloaders: list[DataLoader]
     model: torch.nn.Module
