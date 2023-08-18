@@ -74,7 +74,7 @@ class Trainer_lists():
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler = field(default=None)
     grad_norm_limit: float = field(default=None)
 
-    def __post_init(self) -> None:
+    def __post_init__(self) -> None:
         assert len(self.dataloaders) == len(self.loss_fns), \
             "Each DataLoader must have a corresponding loss function"
 
