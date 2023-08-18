@@ -10,7 +10,7 @@ try:
 except ImportError:
     from typing_extensions import TypeAlias
 
-Tensor: TypeAlias = torch.tensor
+Tensor: TypeAlias = torch.Tensor
 T = TypeVar("T")
 
 
@@ -23,16 +23,17 @@ def train_step_residual(x, model, residual_fn, loss_fn) -> Tensor:
 
 
 def chain_callables(base_arg: Tensor,
+                    model: Callable[[Tensor], Tensor],
                     second_args: Sequence[Tensor],
-                    callables: Sequence[Callable[[Tensor], Tensor]]) -> list[Tensor]:
+                    callables: Sequence[Callable[[Tensor, Tensor], Tensor]]) -> list[Tensor]:
 
-    results = [callables[0](base_arg)]
-    for i in range(1, len(callables)):
-        results.append(callables[i](results[-1], second_args[i-1]))
+    results = [model(base_arg)]
+    for i in range(len(callables)):
+        results.append(callables[i](results[-1], second_args[i]))
     return results
 
 
-def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Generator[list[tuple[T]], None, None]:
+def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Generator[list[T], None, None]:
     # Combine multiple iterators of different lengths
     # Returned iterator lasts until the longest iterator in the input list lasts
     # All other (i.e. shorter) iterators in the input will be cycled
@@ -130,7 +131,7 @@ class WeightedScalarLoss():
     Callable class to calculate a generic scalar loss, multiplied by a weight.
     """
     def __init__(self,
-                 loss_fn: Callable[[Tensor], float],
+                 loss_fn: Callable[[Tensor, Tensor], float],
                  weight: float = 1.0):
         self.loss_fn = loss_fn  # Function/callable class pointer
         self.weight = weight
