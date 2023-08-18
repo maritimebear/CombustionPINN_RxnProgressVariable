@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 
 from typing import Union, Callable, Sequence, TypeVar
-from collections.abc import Iterator
+from collections.abc import Iterator, Generator
 # CIP pool runs Python 3.9, TypeAlias in typing for >= 3.10
 try:
     from typing import TypeAlias
@@ -32,7 +32,7 @@ def chain_callables(base_arg: Tensor,
     return results
 
 
-def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Iterator[list[tuple[T]]]:
+def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Generator[list[tuple[T]], None, None]:
     # Combine multiple iterators of different lengths
     # Returned iterator lasts until the longest iterator in the input list lasts
     # All other (i.e. shorter) iterators in the input will be cycled
@@ -48,7 +48,7 @@ def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Iterator[list[t
             except StopIteration:
                 n_active -= 1
                 if not n_active:
-                    raise  # Rethrow StopIteration from longest iterator
+                    return
                 iterators[i] = iter(iterator_list[i])  # Cycle expired iterator
                 value = next(iterators[i])
             values.append(value)
