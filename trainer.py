@@ -78,7 +78,7 @@ class Trainer_lists():
         assert len(self.dataloaders) == len(self.loss_fns), \
             "Each DataLoader must have a corresponding loss function"
 
-    def train_epoch(self) -> list[Tensor]:
+    def train_epoch(self) -> list[float]:
         losses_mean = [float() for i in range(len(self.loss_fns) + 1)]
 
         for superbatch in training.cycle_shorter_iterators(self.dataloaders):
