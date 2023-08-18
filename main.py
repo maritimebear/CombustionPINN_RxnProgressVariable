@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import training
 import network
 import plotters
+import physics
 
 from typing import TypeAlias
 Tensor: TypeAlias = torch.Tensor
@@ -61,28 +62,15 @@ A = 347850542  # Arrhenius pre-exponential factor
 # --- end of parameters --- #
 
 
-def c_equation(y: Tensor, x: Tensor) -> Tensor:
-    # Calculates residual D(y; x)
-    # Residual == 0 when y(x) satisfies equation system D(y; x)
-
-    y_x = torch.autograd.grad(y, x, grad_outputs=torch.ones_like(y), create_graph=True)[0]  # First derivative
-    y_xx = torch.autograd.grad(y_x, x, grad_outputs=torch.ones_like(y_x), create_graph=True)[0]  # Second derivative
-
-    return ((rho_0 * u_0 * y_x)
-            - (k / c_p * y_xx)
-            - (A * (1 - y)
-               * (rho_0 * T_0 / (T_0 + y * (T_end - T_0)))
-               * torch.exp(-T_act / (T_0 + y * (T_end - T_0)))
-               )
-            )
-
-
 def warmstart(num_epochs: int, loadfile: str = None):
     torch.set_default_dtype(torch.float64)
 
     # Load data
     dataset = training.PINN_Dataset(datafile, ["x"], ["reaction_progress"])
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    # Residual equation
+    c_equation = physics.ReactionProgress(rho_0, u_0, T_0, T_end, k, c_p, T_act, A)
 
     # Test grid to plot change of prediction over training
     testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1).requires_grad_(True)
@@ -155,7 +143,7 @@ def warmstart(num_epochs: int, loadfile: str = None):
                                        ylabel="c", xlabel="x (m)", title="Reaction progress variable")
 
             plt.show()
-            
+
             # Remove after testing
             torch.save(model.state_dict(), save_name)
 
