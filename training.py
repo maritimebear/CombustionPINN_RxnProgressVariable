@@ -2,13 +2,12 @@ import numpy as np
 import pandas as pd
 import torch
 
+from typing import Union, Callable, Sequence, TypeVar
+from collections.abc import Iterator
 # CIP pool runs Python 3.9, TypeAlias in typing for >= 3.10
 try:
-    from collections.abc import Iterator
-    from typing import Union, Callable, TypeAlias, Sequence, TypeVar
+    from typing import TypeAlias
 except ImportError:
-    from collections.abc import Iterator
-    from typing import Union, Callable, Sequence, TypeVar
     from typing_extensions import TypeAlias
 
 Tensor: TypeAlias = torch.tensor
