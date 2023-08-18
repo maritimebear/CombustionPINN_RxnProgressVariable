@@ -12,6 +12,41 @@ except ImportError:
 Tensor: TypeAlias = torch.tensor
 
 
+def train_step_data(x, y, model, loss_fn) -> Tensor:
+    return loss_fn(model(x), y)
+
+
+def train_step_residual(x, model, residual_fn, loss_fn) -> Tensor:
+    return loss_fn(residual_fn(model(x), x), torch.zeros_like(x))
+
+
+def chain_callables(base_arg: Tensor,
+                    second_args: Sequence[Tensor],
+                    callables: Sequence[Callable[[Tensor], Tensor]]) -> list[Tensor]:
+
+    results = [callables[0](base_arg)]
+    for i in range(1, len(callables)):
+        results.append(callables[i](results[-1], second_args[i-1]))
+    return results
+
+
+class SampledDataset():
+    """
+    Create dataset from (x, y) data
+    For use with torch dataloader
+    """
+    def __init__(self, x: Tensor, y: Tensor) -> None:
+        assert x.size() == y.size()
+        self.x = x
+        self.y = y
+
+    def __len__(self) -> int:
+        return len(self.x)
+
+    def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
+        return (self.x[idx], self.y[idx])
+
+
 class PINN_Dataset():
     """
     Reads data (for data loss) from .csv files, intended for use
