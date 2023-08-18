@@ -72,7 +72,7 @@ def pretrain(num_epochs: int, savename: str) -> None:
         for batch in dataloader:
             optimiser.zero_grad()
             x, y = batch
-            y_h, loss = training.chain_callables(x, [y], [model, loss_fns["data"]])
+            y_h, loss = training.chain_callables(x, model, [y], [loss_fns["data"]])
             loss.backward()
             optimiser.step()
             loss_history["data"].append(loss.detach().item())
