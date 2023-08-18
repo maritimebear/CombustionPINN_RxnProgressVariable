@@ -62,3 +62,45 @@ class Trainer():
         # Calculate mean of all saved losses and return as a dict
         return {key: (sum(_list) / len(_list)).detach().item() for
                 key, _list in mean_losses.items()}
+
+
+@dataclass(slots=True)
+class Trainer_lists():
+    dataloaders: list[DataLoader]
+    model: torch.nn.Module
+    optimiser: torch.optim.Optimizer
+    loss_fns: list[Callable[[Tensor, Tensor], Tensor]]
+    # Optional attributes
+    lr_scheduler: torch.optim.lr_scheduler.LRScheduler = field(default=None)
+    grad_norm_limit: float = field(default=None)
+
+    def __post_init(self) -> None:
+        assert len(self.dataloaders) == len(self.loss_fns), \
+            "Each DataLoader must have a corresponding loss function"
+
+    def train_epoch(self) -> list[Tensor]:
+        losses_mean = [float() for i in range(len(self.loss_fns) + 1)]
+
+        for superbatch in training.cycle_shorter_iterators(self.dataloaders):
+            # superbatch: [(x, y), (x, y), ...], each (x, y) corresponds to a loss_fn
+            losses = [loss_fn(self.model(x), y) for
+                      loss_fn, (x, y) in zip(self.loss_fns, superbatch)]
+            loss_total = sum(losses)
+
+            self.optimiser.zero_grad()
+
+            loss_total.backward()
+
+            if self.grad_norm_limit is not None:
+                torch.nn.utils.clip_grad_norm(self.model.parameters(), self.grad_norm_limit)
+
+            self.optimiser.step()
+
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.step()
+
+            losses_mean = [losses_mean[i] + losses[i].detach().item() for
+                           i in range(len(losses))]
+            losses_mean[-1] += loss_total.detach().item()
+
+        return [value / len(losses_mean) for value in losses_mean]
