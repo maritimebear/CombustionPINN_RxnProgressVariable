@@ -69,22 +69,22 @@ class Trainer_lists():
     dataloaders: list[DataLoader]
     model: torch.nn.Module
     optimiser: torch.optim.Optimizer
-    loss_fns: list[Callable[[Tensor, Tensor], Tensor]]
+    callables: list[Callable[[Tensor, Tensor], Tensor]]
     # Optional attributes
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler = field(default=None)
     grad_norm_limit: float = field(default=None)
 
     def __post_init__(self) -> None:
-        assert len(self.dataloaders) == len(self.loss_fns), \
-            "Each DataLoader must have a corresponding loss function"
+        assert len(self.dataloaders) == len(self.callables), \
+            "Each DataLoader must have a corresponding callable or loss function"
 
     def train_epoch(self) -> list[float]:
-        losses_mean = [float() for i in range(len(self.loss_fns) + 1)]
+        losses_mean = [float() for i in range(len(self.callables) + 1)]
 
         for superbatch in training.cycle_shorter_iterators(self.dataloaders):
             # superbatch: [(x, y), (x, y), ...], each (x, y) corresponds to a loss_fn
-            losses = [loss_fn(self.model(x), y) for
-                      loss_fn, (x, y) in zip(self.loss_fns, superbatch)]
+            losses = [f(x, self.model(x), y) for
+                      f, (x, y) in zip(self.callables, superbatch)]
             losses.append(loss_total := sum(losses))
 
             self.optimiser.zero_grad()

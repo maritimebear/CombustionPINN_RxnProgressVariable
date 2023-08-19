@@ -37,9 +37,9 @@ datafile = "./data/c_eqn_solution.csv"
 batchsize_data = 64
 batchsize_residual = batchsize_data
 # learning_rate = 1e-6
-learning_rate = 1e-6
+learning_rate = 1e-8
 lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
-n_epochs = 20_000
+n_epochs = 100_000
 
 loss_weights = {"data": 1e2, "residual": 1e0}
 # grad_clip_limit = 1e-6  # Maximum value for gradient clipping
@@ -104,7 +104,8 @@ def warmstart(num_epochs: int, loadfile: str = None):
     combined_trainer = trainer.Trainer_lists(dataloaders=[data_dl, residual_dl],
                                              model=model,
                                              optimiser=optimiser,
-                                             loss_fns=[loss_fns["data"], loss_fns["residual"]],
+                                             callables=[lambda x, y_h, y: loss_fns["data"](y_h, y),
+                                                        lambda x, y_h, y: loss_fns["residual"](c_equation(y_h, x), y)],
                                              lr_scheduler=lr_scheduler,
                                              grad_norm_limit=grad_clip_limit)
 

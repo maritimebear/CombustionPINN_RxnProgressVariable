@@ -70,7 +70,7 @@ def pretrain(num_epochs: int, savename: str) -> None:
     trainer_data = trainer.Trainer_lists(dataloaders=[dataloader],
                                          model=model,
                                          optimiser=optimiser,
-                                         loss_fns=[loss_fns["data"]])
+                                         callables=[lambda x, y_h, y: loss_fns["data"](y_h, y)])
 
     # Training loop
     for epoch in range(num_epochs):
