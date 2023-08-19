@@ -29,26 +29,26 @@ Tensor: TypeAlias = torch.Tensor
 # --- Parameters --- #
 
 # Training parameters
-# saved_state_path = "Logistic_600_epochs_thinflame.pt"
-saved_state_path = None
+saved_state_path = "Logistic_600_epochs.pt"
+# saved_state_path = None
 save_name = "test.pt"
 # saved_state_path = None
 datafile = "./data/c_eqn_solution.csv"
 batchsize_data = 64
 batchsize_residual = batchsize_data
 # learning_rate = 1e-6
-learning_rate = 1e-6
+learning_rate = 1e-5
 lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
 n_epochs = 50_000
 
-loss_weights = {"data": 1e0, "residual": 1e0}
+loss_weights = {"data": 1e2, "residual": 1e0}
 # grad_clip_limit = 1e-6  # Maximum value for gradient clipping
-grad_clip_limit = 1e-6
+grad_clip_limit = 1e-4
 
 torch.manual_seed(7673345)
 
 # Residuals and domain
-n_residual_points = 10_000
+n_residual_points = 20_000
 extents_x = (0.0, 2e-2)
 
 # Test step and error calculation
@@ -125,20 +125,20 @@ def warmstart(num_epochs: int, loadfile: str = None):
 
         if not (epoch + 1) % 100:
             # Plot losses
-            _, ax_loss = plt.subplots(1, 1, figsize=(4, 4))
+            _, ax_loss = plt.subplots(1, 1, figsize=(8, 8))
             for _label, _list in loss_history.items():
                 ax_loss = plotters.semilogy_plot(ax_loss, _list, label=_label,
                                                  ylabel="Loss", xlabel="Epoch", title="Mean Loss per Epoch")
 
             # Plot test-iteration residual norms
-            _, ax_resnorms = plt.subplots(1, 1, figsize=(4, 4))
+            _, ax_resnorms = plt.subplots(1, 1, figsize=(8, 8))
             for _label, _list in residual_norm.items():
                 ax_resnorms = plotters.semilogy_plot(ax_resnorms, _list, label=_label,
                                                      ylabel="||r||", xlabel="Epoch",
                                                      title="Residual norms, test iteration")
 
             # Plot prediction on testgrid
-            _, ax_pred = plt.subplots(1, 1, figsize=(4, 4))
+            _, ax_pred = plt.subplots(1, 1, figsize=(8, 8))
             ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().numpy(), testgrid.detach().numpy(),
                                        ylabel="c", xlabel="x (m)", title="Reaction progress variable")
 

@@ -22,7 +22,7 @@ T_act = 10064.951  # Activation temperature
 A = 347850542  # Arrhenius pre-exponential factor
 
 flame_location = 7e-3
-flame_width_parameter = 1e6
+flame_width_parameter = 1e3
 
 
 def logistic(x, x0=flame_location, k=flame_width_parameter, L=1.0):
