@@ -37,9 +37,9 @@ datafile = "./data/c_eqn_solution.csv"
 batchsize_data = 64
 batchsize_residual = batchsize_data
 # learning_rate = 1e-6
-learning_rate = 1e-5
+learning_rate = 1e-6
 lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
-n_epochs = 50_000
+n_epochs = 20_000
 
 loss_weights = {"data": 1e2, "residual": 1e0}
 # grad_clip_limit = 1e-6  # Maximum value for gradient clipping
