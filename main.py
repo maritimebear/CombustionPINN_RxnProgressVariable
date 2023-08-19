@@ -21,6 +21,7 @@ import training
 import network
 import plotters
 import physics
+import trainer
 
 from typing import TypeAlias
 Tensor: TypeAlias = torch.Tensor
@@ -28,22 +29,26 @@ Tensor: TypeAlias = torch.Tensor
 # --- Parameters --- #
 
 # Training parameters
-saved_state_path = "Logistic_600_epochs_thinflame.pt"
+# saved_state_path = "Logistic_600_epochs_thinflame.pt"
+saved_state_path = None
 save_name = "test.pt"
 # saved_state_path = None
 datafile = "./data/c_eqn_solution.csv"
-batch_size = 64
+batchsize_data = 64
+batchsize_residual = batchsize_data
+# learning_rate = 1e-6
 learning_rate = 1e-6
 lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
 n_epochs = 50_000
 
-loss_weights = {"data": 1.0, "residual": 1e-8}
-grad_clip_limit = 1e-6  # Maximum value for gradient clipping
+loss_weights = {"data": 1e0, "residual": 1e0}
+# grad_clip_limit = 1e-6  # Maximum value for gradient clipping
+grad_clip_limit = 1e-6
 
 torch.manual_seed(7673345)
 
 # Residuals and domain
-n_residual_points = 1000
+n_residual_points = 10_000
 extents_x = (0.0, 2e-2)
 
 # Test step and error calculation
@@ -66,8 +71,14 @@ def warmstart(num_epochs: int, loadfile: str = None):
     torch.set_default_dtype(torch.float64)
 
     # Load data
-    dataset = training.PINN_Dataset(datafile, ["x"], ["reaction_progress"])
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    data_ds = training.PINN_Dataset(datafile, ["x"], ["reaction_progress"])
+    data_dl = torch.utils.data.DataLoader(data_ds, batch_size=batchsize_data, shuffle=True, pin_memory=True)
+
+    # Collocation points (fixed over all training iterations)
+    collocation_pts = torch.Tensor(n_residual_points, 1).uniform_(*extents_x).requires_grad_(True)
+    residual_ds = training.SampledDataset(collocation_pts, torch.zeros_like(collocation_pts))
+    residual_dl = torch.utils.data.DataLoader(residual_ds, batch_size=batchsize_residual, shuffle=True, pin_memory=True)
+    residual_norm = {"l2": list(), "max": list()}  # Tracks norms of residual vector per test iteration
 
     # Residual equation
     c_equation = physics.ReactionProgress(rho_0, u_0, T_0, T_end, k, c_p, T_act, A)
@@ -89,32 +100,21 @@ def warmstart(num_epochs: int, loadfile: str = None):
                 key, value in loss_weights.items()}
     loss_history = {key: list() for key, _ in loss_weights.items()}  # Losses per iteration
 
-    # Sampler to randomly sample collocation points in each training iteration
-    residual_sampler = training.UniformRandomSampler(n_points=n_residual_points, extents=[extents_x])
-    residual_norm = {"l2": list(), "max": list()}  # Tracks norms of residual vector per test iteration
+    # Set up trainer object
+    combined_trainer = trainer.Trainer_lists(dataloaders=[data_dl, residual_dl],
+                                             model=model,
+                                             optimiser=optimiser,
+                                             loss_fns=[loss_fns["data"], loss_fns["residual"]],
+                                             lr_scheduler=lr_scheduler,
+                                             grad_norm_limit=grad_clip_limit)
 
     # Training loop
     for epoch in range(num_epochs):
         # Train both data and residual losses concurrently
-        for batch in dataloader:
-            optimiser.zero_grad()
-            x_data, y_data = batch
-            yh_data = model(x_data)  # Data prediction
-            x_res = residual_sampler()
-            yh_res = model(x_res)  # Prediction at collocation points
-            residual = c_equation(yh_res, x_res)  # Residuals at collocation points
-            loss_data = loss_fns["data"](yh_data, y_data)
-            loss_res = loss_fns["residual"](residual, torch.zeros_like(residual))
-            loss_total = loss_data + loss_res
-            loss_total.backward()
-            # Clip gradient, not sure about maximum value
-            torch.nn.utils.clip_grad_norm(model.parameters(), grad_clip_limit)
-            optimiser.step()
-            if lr_scheduler is not None:
-                lr_scheduler.step()
-            # Save losses for plotting
-            loss_history["data"].append(loss_data.detach().item())
-            loss_history["residual"].append(loss_res.detach().item())
+        mean_losses = combined_trainer.train_epoch()
+        _ = [loss_history[key].append(mean_losses[i]) for
+             key, i in zip(("data", "residual"), (0, 1))]
+
         # After each training epoch, do a test iteration on testgrid
         yh_test = model(testgrid)
         residual_test = c_equation(yh_test, testgrid)
@@ -128,7 +128,7 @@ def warmstart(num_epochs: int, loadfile: str = None):
             _, ax_loss = plt.subplots(1, 1, figsize=(4, 4))
             for _label, _list in loss_history.items():
                 ax_loss = plotters.semilogy_plot(ax_loss, _list, label=_label,
-                                                 ylabel="Loss", xlabel="Iteration", title="Loss curves")
+                                                 ylabel="Loss", xlabel="Epoch", title="Mean Loss per Epoch")
 
             # Plot test-iteration residual norms
             _, ax_resnorms = plt.subplots(1, 1, figsize=(4, 4))

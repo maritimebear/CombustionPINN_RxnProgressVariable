@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import torch
+from dataclasses import dataclass
 
 from typing import Union, Callable, Sequence, TypeVar
 from collections.abc import Iterator, Generator
@@ -56,15 +57,17 @@ def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Generator[list[
         yield values
 
 
+@dataclass(slots=True, eq=False)
 class SampledDataset():
     """
     Create dataset from (x, y) data
     For use with torch dataloader
     """
-    def __init__(self, x: Tensor, y: Tensor) -> None:
-        assert x.size() == y.size()
-        self.x = x
-        self.y = y
+    x: Tensor
+    y: Tensor
+
+    def __post_init__(self) -> None:
+        assert self.x.size() == self.y.size()
 
     def __len__(self) -> int:
         return len(self.x)
