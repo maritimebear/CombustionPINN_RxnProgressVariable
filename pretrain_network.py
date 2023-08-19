@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import training
 import network
 import plotters
+import trainer
 
 
 def logistic_fn(x, x0, k, L=1.0) -> None:
@@ -15,9 +16,9 @@ def logistic_fn(x, x0, k, L=1.0) -> None:
 
 # --- Parameters --- #
 
-save_path = "Logistic_600_epochs_thinflame.pt"
+save_path = "Logistic_600_epochs.pt"
 flame_location = 7e-3
-flame_width_parameter = 1e6
+flame_width_parameter = 1e3
 
 # Training parameters
 pretrain_fn = logistic_fn
@@ -25,7 +26,7 @@ pretrain_fn_args = [flame_location, flame_width_parameter]
 
 batch_size = 64
 learning_rate = 1e-3
-n_epochs = 1_000
+n_epochs = 600
 
 loss_weights = {"data": 1.0}
 
@@ -50,7 +51,7 @@ def pretrain(num_epochs: int, savename: str) -> None:
     data_y = pretrain_fn(data_x, *pretrain_fn_args)
 
     dataset = training.SampledDataset(data_x, data_y)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
 
     # Test grid to plot change of prediction over training
     testgrid = torch.linspace(*extents_x, n_test_points).reshape(-1, 1)
@@ -65,30 +66,30 @@ def pretrain(num_epochs: int, savename: str) -> None:
                 key, value in loss_weights.items()}
     loss_history = {key: list() for key, _ in loss_weights.items()}  # Losses per iteration
 
+    # Set up trainer
+    trainer_data = trainer.Trainer_lists(dataloaders=[dataloader],
+                                         model=model,
+                                         optimiser=optimiser,
+                                         loss_fns=[loss_fns["data"]])
+
     # Training loop
     for epoch in range(num_epochs):
         print(f"Epoch: {epoch}")
-
-        for batch in dataloader:
-            optimiser.zero_grad()
-            x, y = batch
-            y_h, loss = training.chain_callables(x, model, [y], [loss_fns["data"]])
-            loss.backward()
-            optimiser.step()
-            loss_history["data"].append(loss.detach().item())
+        mean_losses = trainer_data.train_epoch()
+        loss_history["data"].append(mean_losses[0])
 
         # Test step after each epoch
         yh_test = model(testgrid)
 
         if not (epoch + 1) % 100:
             # Plot losses
-            _, ax_loss = plt.subplots(1, 1, figsize=(4, 4))
+            _, ax_loss = plt.subplots(1, 1, figsize=(8, 8))
             for _label, _list in loss_history.items():
                 ax_loss = plotters.semilogy_plot(ax_loss, _list, label=_label,
                                                  ylabel="Loss", xlabel="Iteration", title="Loss curves")
 
             # Plot prediction on testgrid
-            _, ax_pred = plt.subplots(1, 1, figsize=(4, 4))
+            _, ax_pred = plt.subplots(1, 1, figsize=(8, 8))
             ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().numpy(), testgrid.detach().numpy(),
                                        ylabel="y", xlabel="x (m)", title="Prediction")
 
