@@ -37,8 +37,9 @@ datafile = "./data/c_eqn_solution.csv"
 batchsize_data = 64
 batchsize_residual = batchsize_data
 # learning_rate = 1e-6
-learning_rate = 1e-8
-lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
+learning_rate = 1e-6
+# lr_decay_exp = 1 - 1e-8  # Exponential learning rate decay
+lr_decay_exp = 1 - 1e-5
 n_epochs = 100_000
 
 loss_weights = {"data": 1e2, "residual": 1e0}
