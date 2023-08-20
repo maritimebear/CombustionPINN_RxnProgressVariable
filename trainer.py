@@ -69,7 +69,7 @@ class Trainer_lists():
     dataloaders: list[DataLoader]
     model: torch.nn.Module
     optimiser: torch.optim.Optimizer
-    callables: list[Callable[[Tensor, Tensor], Tensor]]
+    callables: list[Callable[[Tensor, Tensor, Tensor], Tensor]]
     # Optional attributes
     lr_scheduler: torch.optim.lr_scheduler.LRScheduler = field(default=None)
     grad_norm_limit: float = field(default=None)
