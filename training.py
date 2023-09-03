@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import utils
 import plotters
 
-from typing import TypeAlias
+from typing import TypeAlias, Callable
 Tensor: TypeAlias = torch.Tensor
 
 
@@ -31,11 +31,12 @@ def pretrain(dataloader,
                                       )
 
     # Training loop
+    print(f"Pretraining for {num_epochs} epochs")
     for epoch in range(num_epochs):
         mean_losses = trainer_data.train_epoch()
         loss_history["data"].append(mean_losses[0])
 
-        if test_interval > 0 and not ((epoch + 1) % test_interval):
+        if test_interval > 0 and not (epoch % test_interval):
             print(f"Epoch: {epoch}")
             # Test step after each epoch
             yh_test = model(testgrid)
@@ -51,6 +52,7 @@ def pretrain(dataloader,
             plt.show()
 
     # Save model after training
+    print("Saving model")
     torch.save(model.state_dict(), savename)
 
 
@@ -58,21 +60,20 @@ def warmstart(dataloaders,
               model,
               optim,
               loss_weights,
-              collocation_pts: Tensor,
               residual_eqn: Callable[[Tensor, Tensor], Tensor],
               num_epochs: int,
               savename: str,
               loadname: str = None,
-              lr_scheduler = None,
-              grad_clip_limit = None,
+              lr_scheduler=None,
+              grad_clip_limit: float = None,
               testgrid: Tensor = None,
-              test_interval: int: None
+              test_interval: int = None
               ) -> None:
 
     # Load network parameters if specified
-    if loadfile is not None:
+    if loadname is not None:
         print("Loading saved model state")
-        model.load_state_dict(torch.load(loadfile))
+        model.load_state_dict(torch.load(loadname))
 
     # Set up losses and residual tracking
     loss_fns = {key: utils.WeightedScalarLoss(torch.nn.MSELoss(), weight=value) for
@@ -91,6 +92,7 @@ def warmstart(dataloaders,
                                           )
 
     # Training loop
+    print(f"Training for {num_epochs} epochs")
     for epoch in range(num_epochs):
         # Train both data and residual losses concurrently
         mean_losses = combined_trainer.train_epoch()
@@ -105,7 +107,7 @@ def warmstart(dataloaders,
         residual_norm["l2"].append(torch.linalg.norm(residual_test.detach()))
         residual_norm["max"].append(torch.linalg.norm(residual_test.detach(), ord=float('inf')))
 
-        if test_interval > 0 and not ((epoch + 1) % test_interval):
+        if test_interval > 0 and not (epoch % test_interval):
             print(f"Epoch: {epoch}")
             # Plot losses
             _, ax_loss = plt.subplots(1, 1, figsize=(8, 8))
@@ -127,4 +129,5 @@ def warmstart(dataloaders,
 
             plt.show()
 
-    torch.save(model.state_dict(), save_name)
+    print("Saving model")
+    torch.save(model.state_dict(), savename)

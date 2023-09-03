@@ -33,8 +33,6 @@ import physics
 import utils
 import training
 
-from typing import TypeAlias
-Tensor: TypeAlias = torch.Tensor
 
 # --- Parameters --- #
 
@@ -59,7 +57,7 @@ n_x_pretrain = 10_000  # Number of data points for pretraining
 
 
 # Main training phase parameters
-# Thermodynamic and chemical parameters
+# Thermodynamic and chemical parameters (from Cantera)
 rho_0 = 1.130
 u_0 = 0.3788
 T_0 = 298
@@ -85,20 +83,26 @@ grad_clip_limit = 1e-4
 
 
 # Set up components from parameters
+torch.set_default_dtype(default_dtype)
+
 model = network.FCN(1, 1, neurons_per_hidden_layer, n_hidden_layers)
 testgrid = torch.linspace(*extents_x, n_testpoints).reshape(-1, 1).requires_grad_(True)  # PyTorch complains about shape mismatch without reshape
 
 # Pretraining
+
+# Dataloader
 x_pretrain = utils.UniformRandomSampler(n_points=n_x_pretrain, extents=[extents_x], requires_grad=False)()
 y_pretrain = utils.logistic_fn(x_pretrain, flame_location, flame_width_parameter)
 ds_pretrain = utils.SampledDataset(x_pretrain, y_pretrain)
 dl_pretrain = torch.utils.data.DataLoader(ds_pretrain, batch_size=bs_pretrain, shuffle=True, pin_memory=True)
+
+# Optimiser
 optim_pretrain = torch.optim.Adam(model.parameters(), lr=lr_pretrain)
 
 # Main training phase
 
 # Dataloaders
-collocation_pts = torch.Tensor(n_x_residual, 1).uniform_(*extents_x).requires_grad_(True)
+collocation_pts = torch.Tensor(n_x_residual, 1).uniform_(*extents_x).requires_grad_(True)  # Use the same collocation points throughout training
 residual_eqn = physics.ReactionProgress(rho_0, u_0, T_0, T_end, k, c_p, T_act, A)
 # Numerical solution dataloader
 ds_ceqn = utils.PINN_Dataset(datafile_ceqn, ["x"], ["reaction_progress"])
@@ -112,33 +116,32 @@ optim_main = torch.optim.Adam(model.parameters(), lr=lr_main)
 lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optim_main, gamma=lr_decay_exp)
 
 # Training
-torch.set_default_dtype(default_dtype)
+
 
 # Perform pretraining
 torch.manual_seed(rng_seed)
-print("Pretraining")
-training.pretrain(dl_pretrain,
-               model,
-               optim_pretrain,
-               loss_weights_pretrain,
-               num_epochs=n_epochs_pretrain,
-               savename=savename_pretrain,
-               testgrid=testgrid,
-               test_interval=100
-               )
+training.pretrain(dataloader=dl_pretrain,
+                  model=model,
+                  optim=optim_pretrain,
+                  loss_weights=loss_weights_pretrain,
+                  num_epochs=n_epochs_pretrain,
+                  savename=savename_pretrain,
+                  testgrid=testgrid,
+                  test_interval=100
+                  )
 
 # Main training phase
 torch.manual_seed(rng_seed)
-print("Main training phase")
-training.warmstart([dl_ceqn, dl_residual],
-                model,
-                optim_main,
-                loss_weights_main,
-                n_epochs_main,
-                savename_main,
-                loadname_main,
-                lr_scheduler,
-                grad_clip_limit,
-                testgrid,
-                test_interval=100
-                )
+training.warmstart(dataloaders=[dl_ceqn, dl_residual],
+                   model=model,
+                   optim=optim_main,
+                   loss_weights=loss_weights_main,
+                   residual_eqn=residual_eqn,
+                   num_epochs=n_epochs_main,
+                   savename=savename_main,
+                   loadname=loadname_main,
+                   lr_scheduler=lr_scheduler,
+                   grad_clip_limit=grad_clip_limit,
+                   testgrid=testgrid,
+                   test_interval=100
+                   )
