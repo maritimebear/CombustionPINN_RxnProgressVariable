@@ -25,7 +25,6 @@ training is carried out in two phases:
 
 """
 
-
 import torch
 
 import network
@@ -72,7 +71,7 @@ savename_main = "main_utils.pt"
 datafile_ceqn = "./data/c_eqn_solution.csv"  # Numerical solution of the governing equation
 bs_ceqn = 64
 bs_residual = bs_ceqn  # Two dataloaders - one with solution data, another with collocation points for residuals
-lr_main = 1e-6
+lr_main = 1e-7  # Learning rate kept low because solution is very non-linear, training tends to bounce around minimum
 lr_decay_exp = 1 - 1e-5  # Exponential learning-rate decay
 n_epochs_main = 100_000
 loss_weights_main = {"data": 1e2, "residual": 1e0}
@@ -83,6 +82,7 @@ grad_clip_limit = 1e-4
 
 
 # Set up components from parameters
+
 torch.set_default_dtype(default_dtype)
 
 model = network.FCN(1, 1, neurons_per_hidden_layer, n_hidden_layers)
@@ -115,8 +115,8 @@ dl_residual = torch.utils.data.DataLoader(ds_residual, batch_size=bs_residual, s
 optim_main = torch.optim.Adam(model.parameters(), lr=lr_main)
 lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optim_main, gamma=lr_decay_exp)
 
-# Training
 
+# Training
 
 # Perform pretraining
 torch.manual_seed(rng_seed)
