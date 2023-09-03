@@ -28,10 +28,10 @@ training is carried out in two phases:
 
 import torch
 
-import training
 import network
 import physics
 import utils
+import training
 
 from typing import TypeAlias
 Tensor: TypeAlias = torch.Tensor
@@ -70,7 +70,7 @@ T_act = 10064.951  # Activation temperature
 A = 347850542  # Arrhenius pre-exponential factor
 
 loadname_main = savename_pretrain
-savename_main = "main_training.pt"
+savename_main = "main_utils.pt"
 datafile_ceqn = "./data/c_eqn_solution.csv"  # Numerical solution of the governing equation
 bs_ceqn = 64
 bs_residual = bs_ceqn  # Two dataloaders - one with solution data, another with collocation points for residuals
@@ -89,9 +89,9 @@ model = network.FCN(1, 1, neurons_per_hidden_layer, n_hidden_layers)
 testgrid = torch.linspace(*extents_x, n_testpoints).reshape(-1, 1).requires_grad_(True)  # PyTorch complains about shape mismatch without reshape
 
 # Pretraining
-x_pretrain = training.UniformRandomSampler(n_points=n_x_pretrain, extents=[extents_x], requires_grad=False)()
+x_pretrain = utils.UniformRandomSampler(n_points=n_x_pretrain, extents=[extents_x], requires_grad=False)()
 y_pretrain = utils.logistic_fn(x_pretrain, flame_location, flame_width_parameter)
-ds_pretrain = training.SampledDataset(x_pretrain, y_pretrain)
+ds_pretrain = utils.SampledDataset(x_pretrain, y_pretrain)
 dl_pretrain = torch.utils.data.DataLoader(ds_pretrain, batch_size=bs_pretrain, shuffle=True, pin_memory=True)
 optim_pretrain = torch.optim.Adam(model.parameters(), lr=lr_pretrain)
 
@@ -101,10 +101,10 @@ optim_pretrain = torch.optim.Adam(model.parameters(), lr=lr_pretrain)
 collocation_pts = torch.Tensor(n_x_residual, 1).uniform_(*extents_x).requires_grad_(True)
 residual_eqn = physics.ReactionProgress(rho_0, u_0, T_0, T_end, k, c_p, T_act, A)
 # Numerical solution dataloader
-ds_ceqn = training.PINN_Dataset(datafile_ceqn, ["x"], ["reaction_progress"])
+ds_ceqn = utils.PINN_Dataset(datafile_ceqn, ["x"], ["reaction_progress"])
 dl_ceqn = torch.utils.data.DataLoader(ds_ceqn, batch_size=bs_ceqn, shuffle=True, pin_memory=True)
 # Residual dataloader
-ds_residual = training.SampledDataset(collocation_pts, torch.zeros_like(collocation_pts))
+ds_residual = utils.SampledDataset(collocation_pts, torch.zeros_like(collocation_pts))
 dl_residual = torch.utils.data.DataLoader(ds_residual, batch_size=bs_residual, shuffle=True, pin_memory=True)
 
 # Optimiser
@@ -118,25 +118,27 @@ torch.set_default_dtype(default_dtype)
 torch.manual_seed(rng_seed)
 print("Pretraining")
 training.pretrain(dl_pretrain,
-                  model,
-                  optim_pretrain,
-                  loss_weights_pretrain,
-                  num_epochs=n_epochs_pretrain,
-                  savename=savename_pretrain,
-                  testgrid=testgrid,
-                  test_interval=100)
+               model,
+               optim_pretrain,
+               loss_weights_pretrain,
+               num_epochs=n_epochs_pretrain,
+               savename=savename_pretrain,
+               testgrid=testgrid,
+               test_interval=100
+               )
 
 # Main training phase
 torch.manual_seed(rng_seed)
 print("Main training phase")
 training.warmstart([dl_ceqn, dl_residual],
-                   model,
-                   optim_main,
-                   loss_weights_main,
-                   n_epochs_main,
-                   savename_main,
-                   loadname_main,
-                   lr_scheduler,
-                   grad_clip_limit,
-                   testgrid,
-                   test_interval=100)
+                model,
+                optim_main,
+                loss_weights_main,
+                n_epochs_main,
+                savename_main,
+                loadname_main,
+                lr_scheduler,
+                grad_clip_limit,
+                testgrid,
+                test_interval=100
+                )
