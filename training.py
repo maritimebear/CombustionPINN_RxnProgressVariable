@@ -1,175 +1,130 @@
-import numpy as np
-import pandas as pd
 import torch
-from dataclasses import dataclass
+import matplotlib.pyplot as plt
 
-from typing import Union, Callable, Sequence, TypeVar
-from collections.abc import Iterator, Generator
-# CIP pool runs Python 3.9, TypeAlias in typing for >= 3.10
-try:
-    from typing import TypeAlias
-except ImportError:
-    from typing_extensions import TypeAlias
+import utils
+import plotters
 
+from typing import TypeAlias
 Tensor: TypeAlias = torch.Tensor
-T = TypeVar("T")
 
 
-def train_step_data(x, y, model, loss_fn) -> Tensor:
-    return loss_fn(model(x), y)
+def pretrain(dataloader,
+             model,
+             optim,
+             loss_weights,
+             num_epochs: int,
+             savename: str,
+             testgrid: Tensor = None,
+             test_interval: int = 0,
+             ) -> None:
+
+    # Set up losses
+    loss_fns = {key: utils.WeightedScalarLoss(torch.nn.MSELoss(), weight=value) for
+                key, value in loss_weights.items()}
+    loss_history = {key: list() for key, _ in loss_weights.items()}  # Losses per iteration
+
+    # Set up trainer
+    trainer_data = utils.EpochTrainer(dataloaders=[dataloader],
+                                      model=model,
+                                      optimiser=optim,
+                                      callables=[lambda x, y_h, y: loss_fns["data"](y_h, y)]
+                                      )
+
+    # Training loop
+    for epoch in range(num_epochs):
+        mean_losses = trainer_data.train_epoch()
+        loss_history["data"].append(mean_losses[0])
+
+        if test_interval > 0 and not ((epoch + 1) % test_interval):
+            print(f"Epoch: {epoch}")
+            # Test step after each epoch
+            yh_test = model(testgrid)
+            # Plot losses
+            _, ax_loss = plt.subplots(1, 1, figsize=(8, 8))
+            for _label, _list in loss_history.items():
+                ax_loss = plotters.semilogy_plot(ax_loss, _list, label=_label,
+                                                 ylabel="Loss", xlabel="Iteration", title="Loss curves")
+            # Plot prediction on testgrid
+            _, ax_pred = plt.subplots(1, 1, figsize=(8, 8))
+            ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().numpy(), testgrid.detach().numpy(),
+                                       ylabel="y", xlabel="x (m)", title="Prediction")
+            plt.show()
+
+    # Save model after training
+    torch.save(model.state_dict(), savename)
 
 
-def train_step_residual(x, model, residual_fn, loss_fn) -> Tensor:
-    return loss_fn(residual_fn(model(x), x), torch.zeros_like(x))
+def warmstart(dataloaders,
+              model,
+              optim,
+              loss_weights,
+              collocation_pts: Tensor,
+              residual_eqn: Callable[[Tensor, Tensor], Tensor],
+              num_epochs: int,
+              savename: str,
+              loadname: str = None,
+              lr_scheduler = None,
+              grad_clip_limit = None,
+              testgrid: Tensor = None,
+              test_interval: int: None
+              ) -> None:
 
+    # Load network parameters if specified
+    if loadfile is not None:
+        print("Loading saved model state")
+        model.load_state_dict(torch.load(loadfile))
 
-def chain_callables(base_arg: Tensor,
-                    model: Callable[[Tensor], Tensor],
-                    second_args: Sequence[Tensor],
-                    callables: Sequence[Callable[[Tensor, Tensor], Tensor]]) -> list[Tensor]:
+    # Set up losses and residual tracking
+    loss_fns = {key: utils.WeightedScalarLoss(torch.nn.MSELoss(), weight=value) for
+                key, value in loss_weights.items()}
+    loss_history = {key: list() for key, _ in loss_weights.items()}  # Losses per iteration
+    residual_norm = {"l2": list(), "max": list()}  # Tracks norms of residual vector per test iteration
 
-    results = [model(base_arg)]
-    for i in range(len(callables)):
-        results.append(callables[i](results[-1], second_args[i]))
-    return results
+    # Set up trainer object
+    combined_trainer = utils.EpochTrainer(dataloaders=dataloaders,
+                                          model=model,
+                                          optimiser=optim,
+                                          callables=[lambda x, y_h, y: loss_fns["data"](y_h, y),
+                                                     lambda x, y_h, y: loss_fns["residual"](residual_eqn(y_h, x), y)],
+                                          lr_scheduler=lr_scheduler,
+                                          grad_norm_limit=grad_clip_limit
+                                          )
 
+    # Training loop
+    for epoch in range(num_epochs):
+        # Train both data and residual losses concurrently
+        mean_losses = combined_trainer.train_epoch()
+        _ = [loss_history[key].append(mean_losses[i]) for
+             key, i in zip(("data", "residual"), (0, 1))]
 
-def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Generator[list[T], None, None]:
-    # Combine multiple iterators of different lengths
-    # Returned iterator lasts until the longest iterator in the input list lasts
-    # All other (i.e. shorter) iterators in the input will be cycled
-    # Intended to combine multiple torch Dataloaders of different lengths
-    # Inspired by itertools.zip_longest()
-    assert (n_active := len(iterator_list)) > 0, "Input list is empty?"
-    iterators = [iter(it) for it in iterator_list]
-    while True:
-        values = []
-        for i, it in enumerate(iterators):
-            try:
-                value = next(it)
-            except StopIteration:
-                n_active -= 1
-                if not n_active:
-                    return
-                iterators[i] = iter(iterator_list[i])  # Cycle expired iterator
-                value = next(iterators[i])
-            values.append(value)
-        yield values
+        # After each training epoch, do a test iteration on testgrid
+        # Evaluating residuals after each training epoch to see if residuals explode
+        # during training
+        yh_test = model(testgrid)
+        residual_test = residual_eqn(yh_test, testgrid)
+        residual_norm["l2"].append(torch.linalg.norm(residual_test.detach()))
+        residual_norm["max"].append(torch.linalg.norm(residual_test.detach(), ord=float('inf')))
 
+        if test_interval > 0 and not ((epoch + 1) % test_interval):
+            print(f"Epoch: {epoch}")
+            # Plot losses
+            _, ax_loss = plt.subplots(1, 1, figsize=(8, 8))
+            for _label, _list in loss_history.items():
+                ax_loss = plotters.semilogy_plot(ax_loss, _list, label=_label,
+                                                 ylabel="Loss", xlabel="Epoch", title="Mean Loss per Epoch")
 
-@dataclass(slots=True, eq=False)
-class SampledDataset():
-    """
-    Create dataset from (x, y) data
-    For use with torch dataloader
-    """
-    x: Tensor
-    y: Tensor
+            # Plot test-iteration residual norms
+            _, ax_resnorms = plt.subplots(1, 1, figsize=(8, 8))
+            for _label, _list in residual_norm.items():
+                ax_resnorms = plotters.semilogy_plot(ax_resnorms, _list, label=_label,
+                                                     ylabel="||r||", xlabel="Epoch",
+                                                     title="Residual norms, test iteration")
 
-    def __post_init__(self) -> None:
-        assert self.x.size() == self.y.size()
+            # Plot prediction on testgrid
+            _, ax_pred = plt.subplots(1, 1, figsize=(8, 8))
+            ax_pred = plotters.xy_plot(ax_pred, yh_test.detach().numpy(), testgrid.detach().numpy(),
+                                       ylabel="c", xlabel="x (m)", title="Reaction progress variable")
 
-    def __len__(self) -> int:
-        return len(self.x)
+            plt.show()
 
-    def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
-        return (self.x[idx], self.y[idx])
-
-
-class PINN_Dataset():
-    """
-    Reads data (for data loss) from .csv files, intended for use
-    with torch.utils.data.Dataloader.
-
-    Returns data as (input array, output array), where inputs and outputs are
-    wrt the PINN model.
-    """
-    def __init__(self,
-                 filename: str,
-                 input_cols: Union[list[str], list[int]],
-                 output_cols: Union[list[str], list[int]]):
-        """
-        filename: .csv file containing data
-        input_cols, output_cols: column names or column indices of input and
-        output data in the .csv file
-
-        input_cols, output_cols must be lists to guarantee numpy.ndarray is returned
-        """
-        data = self._read_data(filename)
-        # Split data into inputs and outputs
-        self._inputs, self._outputs = self._split_inputs_outputs(data, input_cols, output_cols)
-
-    def _read_data(self, filename: str) -> pd.DataFrame:
-        return pd.read_csv(filename)
-
-    def _split_inputs_outputs(self,
-                              data: pd.DataFrame,
-                              input_cols: Union[list[str], list[int]],
-                              output_cols: Union[list[str], list[int]]
-                              ) -> tuple[np.ndarray, np.ndarray]:
-
-        # try-catch block to access columns in .csv by either names or indices
-        try:
-            # data.loc inputs string labels (column names)
-            inputs, outputs = [data.loc[:, labels].to_numpy() for
-                               labels in (input_cols, output_cols)]
-        except KeyError:
-            # data.iloc expects int indices
-            inputs, outputs = [data.iloc[:, labels].to_numpy() for
-                               labels in (input_cols, output_cols)]
-
-        assert len(inputs) == len(outputs)
-        return (inputs, outputs)
-
-    def __len__(self) -> int:
-        return len(self._inputs)
-
-    def __getitem__(self, idx: int) -> tuple[np.ndarray, np.ndarray]:
-        return (self._inputs[idx], self._outputs[idx])
-# end class PINN_Dataset
-
-
-class WeightedScalarLoss():
-    """
-    Callable class to calculate a generic scalar loss, multiplied by a weight.
-    """
-    def __init__(self,
-                 loss_fn: Callable[[Tensor, Tensor], float],
-                 weight: float = 1.0):
-        self.loss_fn = loss_fn  # Function/callable class pointer
-        self.weight = weight
-
-    def __call__(self,
-                 prediction: Tensor,
-                 target: Tensor) -> float:
-        return (self.weight * self.loss_fn(prediction, target))
-# end class WeightedScalarLoss
-
-
-class UniformRandomSampler():
-    """
-    Callable class, returns tensors with uniform-random entries, in the shape (n_points, n_dims).
-    Each column corresponds to a space or time dimension (x, y, z, t) in the governing equations.
-
-    n_dims inferred from number of 'extents' arguments passed to constructor.
-
-    Each sequence in 'extents' defines the sampling interval in the corresponding coordinate,
-    i.e. the corresponding column of the returned tensor.
-    """
-    def __init__(self,
-                 n_points: int,
-                 extents: Sequence[Sequence[float]],
-                 *,
-                 requires_grad=True):
-        """
-        'extents' must be a sequence of sequences,
-            eg. [(0.0, 1.0), (0.0, 0.0)] for e1: [0,1], e2: [0,0]
-        """
-        self.n_points = n_points
-        self.extents = extents
-        self.requires_grad = requires_grad
-        # Lambdas used to generate tensors
-        self.generate = lambda _range: (torch.Tensor(n_points, 1).uniform_(*_range).requires_grad_(requires_grad))
-
-    def __call__(self) -> Tensor:
-        return torch.hstack([self.generate(coord) for coord in self.extents])
+    torch.save(model.state_dict(), save_name)
