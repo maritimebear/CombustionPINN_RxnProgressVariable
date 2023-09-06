@@ -41,6 +41,7 @@ def cycle_shorter_iterators(iterator_list: list[Iterator[T]]) -> Generator[list[
 
 @dataclass(slots=True, eq=False)
 class EpochTrainer():
+    # Coordinate dataloaders, model, ... and train for one epoch
     dataloaders: list[DataLoader]
     model: torch.nn.Module
     optimiser: torch.optim.Optimizer
@@ -54,7 +55,8 @@ class EpochTrainer():
             "Each DataLoader must have a corresponding callable or loss function"
 
     def train_epoch(self) -> list[float]:
-        losses_mean = [float() for i in range(len(self.callables) + 1)]
+        # Returns mean losses over epoch
+        losses_cumulative = [float() for i in range(len(self.callables) + 1)]  # One extra element for total loss
 
         for superbatch in cycle_shorter_iterators(self.dataloaders):
             # superbatch: [(x, y), (x, y), ...], each (x, y) corresponds to a loss_fn
@@ -74,10 +76,10 @@ class EpochTrainer():
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
 
-            losses_mean = [losses_mean[i] + losses[i].detach().item() for
+            losses_cumulative = [losses_cumulative[i] + losses[i].detach().item() for
                            i in range(len(losses))]
 
-        return [value / len(losses_mean) for value in losses_mean]
+        return [value / len(losses_cumulative) for value in losses_cumulative]
 
 
 @dataclass(slots=True, eq=False)
