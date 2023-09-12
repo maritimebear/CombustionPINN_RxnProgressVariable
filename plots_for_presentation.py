@@ -3,7 +3,6 @@
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 import pandas as pd
-import numpy as np
 import torch
 
 import seaborn as sns
@@ -17,6 +16,7 @@ import utils
 torch.set_default_dtype(torch.float64)
 plt.rcParams.update({"font.size": 16})
 
+# X-axis ticks in scientific notation
 formatter = ticker.ScalarFormatter(useMathText=True)
 formatter.set_scientific(True)
 formatter.set_powerlimits((-1, 1))
@@ -31,7 +31,6 @@ _, ax_ref = plt.subplots(1, 1, figsize=(8, 8))
 ax_ref.xaxis.set_major_formatter(formatter)
 ax_ref = plotters.xy_plot(ax_ref, y.detach(), x.detach(),
                             ylabel="c", xlabel="x (m)", title="Reaction progress variable")
-# p_ref = plt.plot(ref_data["x"], ref_data["reaction_progress"])
 
 # Pretrain vs reference data
 _, ax_logistic = plt.subplots(1, 1, figsize=(8, 8))
@@ -55,10 +54,10 @@ ax_pred = plotters.xy_plot(ax_pred, y.detach(), x.detach(), label="Ground truth"
 ax_pred = plotters.xy_plot(ax_pred, y_hat.detach(), x.detach(), label="Prediction", ylabel="c",
                            xlabel="x (m)", title="Reaction progress variable")
 
-
+# Error plot
 _, ax_error = plt.subplots(1, 1, figsize=(8, 8))
 ax_error.xaxis.set_major_formatter(formatter)
 ax_error = plotters.xy_plot(ax_error, error.detach(), x.detach(), xlabel="x (m)",
-                            ylabel="Error", title="Error in prediction")
+                            ylabel="Absolute Error", title="Error in prediction")
 
 plt.show()
