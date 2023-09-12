@@ -45,7 +45,7 @@ n_hidden_layers = 9
 neurons_per_hidden_layer = 64
 
 # Pretraining parameters
-savename_pretrain = "Logistic_pretrained.pt"
+savename_pretrain = "logistic_pretrained.pt"
 flame_location = 7e-3
 flame_width_parameter = 1e3
 bs_pretrain = 64
@@ -67,13 +67,13 @@ T_act = 10064.951  # Activation temperature
 A = 347850542  # Arrhenius pre-exponential factor
 
 loadname_main = savename_pretrain
-savename_main = "main_utils.pt"
+savename_main = "trained_network.pt"
 datafile_ceqn = "./data/c_eqn_solution.csv"  # Numerical solution of the governing equation
 bs_ceqn = 64
 bs_residual = bs_ceqn  # Two dataloaders - one with solution data, another with collocation points for residuals
-lr_main = 1e-7  # Learning rate kept low because solution is very non-linear, training tends to bounce around minimum
-lr_decay_exp = 1 - 1e-5  # Exponential learning-rate decay
-n_epochs_main = 100_000
+lr_main = 1e-6  # Learning rate kept low because solution is very non-linear, training tends to bounce around minimum
+lr_decay_exp = 1 - 1e-6  # Exponential learning-rate decay
+n_epochs_main = 10_000
 loss_weights_main = {"data": 1e2, "residual": 1e0}
 n_x_residual = 20_000
 grad_clip_limit = 1e-4
